@@ -18,7 +18,7 @@ SYMBOL = 'TSLA'
 QTY = 1                
 BAR_TIMEFRAME = '1Day' 
 
-# Variable globale pour stocker les dernières données du Bot (lues par l'API)
+# Variable globale enrichie avec l'historique des transactions
 bot_status = {
     "status": "Initialisation...",
     "symbol": SYMBOL,
@@ -27,19 +27,17 @@ bot_status = {
     "sma200": 0.0,
     "signal": "HOLD",
     "market_open": False,
-    "last_update": ""
+    "last_update": "",
+    "trades": [] # Contiendra la liste des derniers ordres passés
 }
 
 class APIHandler(BaseHTTPRequestHandler):
     """Gère les requêtes web et renvoie l'état du bot en JSON"""
     def do_GET(self):
-        # Autoriser votre site web externe à lire les données (CORS)
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*') # Permet l'affichage sur service-it.dz
+        self.send_header('Access-Control-Allow-Origin', '*') 
         self.end_headers()
-        
-        # Envoyer les données au format JSON
         self.wfile.write(json.dumps(bot_status).encode('utf-8'))
 
     def do_HEAD(self):
@@ -69,7 +67,6 @@ def get_signals():
         prev_sma50 = bars['SMA50'].iloc[-2]
         prev_sma200 = bars['SMA200'].iloc[-2]
 
-        # Mettre à jour les données partagées
         bot_status["last_price"] = last_close
         bot_status["sma50"] = current_sma50
         bot_status["sma200"] = current_sma200
@@ -89,7 +86,6 @@ def trade_logic():
     try:
         signal = get_signals()
         bot_status["signal"] = signal
-        bot_status["status"] = "Analyse en cours..."
         
         try:
             position = api.get_position(SYMBOL)
@@ -99,12 +95,28 @@ def trade_logic():
             has_position = False
             current_qty = 0
 
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+
         if signal == 'BUY' and not has_position:
             api.submit_order(symbol=SYMBOL, qty=QTY, side='buy', type='market', time_in_force='gtc')
-            bot_status["status"] = f"🚀 Ordre d'ACHAT passé pour {QTY} action(s)"
+            bot_status["status"] = f"🚀 Ordre d'ACHAT passé"
+            # Ajouter à l'historique visible sur le site
+            bot_status["trades"].insert(0, {
+                "date": current_time,
+                "type": "ACHAT (BUY)",
+                "qty": QTY,
+                "price": bot_status["last_price"]
+            })
         elif signal == 'SELL' and has_position:
             api.submit_order(symbol=SYMBOL, qty=current_qty, side='sell', type='market', time_in_force='gtc')
-            bot_status["status"] = f"📉 Ordre de VENTE passé pour {current_qty} action(s)"
+            bot_status["status"] = f"📉 Ordre de VENTE passé"
+            # Ajouter à l'historique visible sur le site
+            bot_status["trades"].insert(0, {
+                "date": current_time,
+                "type": "VENTE (SELL)",
+                "qty": current_qty,
+                "price": bot_status["last_price"]
+            })
         else:
             bot_status["status"] = "⚖️ En attente d'un croisement de tendance."
 
@@ -114,7 +126,6 @@ def trade_logic():
 if __name__ == "__main__":
     print("--- 🤖 Le Bot Alpaca Stock est en ligne ---")
     
-    # Lancer l'API en arrière-plan
     server_thread = threading.Thread(target=run_api_server, daemon=True)
     server_thread.start()
     
