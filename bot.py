@@ -14,8 +14,8 @@ BASE_URL = 'https://paper-api.alpaca.markets'  # URL pour de l'argent virtuel
 api = tradeapi.REST(API_KEY, SECRET_KEY, BASE_URL, api_version='v2')
 
 # Paramètres du bot
-SYMBOL = 'AAPL'       # Action à trader (Ex: Apple)
-QTY = 5               # Nombre d'actions à acheter/vendre par trade
+SYMBOL = 'TSLA'       # Action à trader (Ex: Apple)
+QTY = 1               # Nombre d'actions à acheter/vendre par trade
 BAR_TIMEFRAME = '1Day' # Analyse sur des bougies journalières (plus fiable)
 
 def get_signals():
